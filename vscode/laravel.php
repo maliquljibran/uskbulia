@@ -1,3 +1,12 @@
+<!-- Clear-History
+
+Remove-Item (Get-PSReadlineOption).HistorySavePath -->
+
+<!-- composer require laravel/ui (untuk authenticate)
+
+composer require barryvdh/laravel-dompdf -->
+
+
 {
   "homect": {
     "prefix": [
