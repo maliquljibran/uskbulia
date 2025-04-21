@@ -17,7 +17,7 @@ class DompetController extends Controller
     }
 
     public function topup(Request $request)
-    {
+    {   
         $request->validate([
             'credit' => 'required|numeric|min:10000'
         ]);
@@ -209,52 +209,215 @@ class DompetController extends Controller
         return view('wallet.all', compact('mutasi'));
     }
 
-    public function mutasi()
-    {
-        $user = Auth::user();
-        $mutasi = Dompet::where('user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+    public function mutasi(Request $request)
+{
+    $user = Auth::user();
+    $filter = $request->input('filter');
+    $search = $request->input('search');
+    $sort = $request->input('sort', 'newest'); // Default to newest if not specified
 
-        return view('siswa.mutasi', compact('mutasi'));
+    $query = Dompet::where('user_id', $user->id);
+
+    // Apply type filter
+    if ($filter === 'topup') {
+        $query->where(function($q) {
+            $q->where('description', 'Top-up')
+              ->orWhere('description', 'LIKE', '%Top-up%');
+        });
+    } elseif ($filter === 'withdraw') {
+        $query->where(function($q) {
+            $q->where('description', 'Tarik Tunai')
+              ->orWhere('description', 'LIKE', '%Withdraw%')
+              ->orWhere('description', 'LIKE', '%Tarik%');
+        });
+    } elseif ($filter === 'transfer') {
+        $query->where('description', 'LIKE', '%Transfer%');
+    } elseif ($filter === 'rejected') {
+        $query->where('status', 'rejected');
     }
+
+    // Apply search if provided
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            // Search in description
+            $q->where('description', 'LIKE', '%' . $search . '%');
+            // No need to search by user name since we already filter by user_id
+        });
+    }
+
+    // Apply sorting
+    if ($sort === 'oldest') {
+        $query->orderBy('created_at', 'asc');
+    } else {
+        // Default to newest
+        $query->orderBy('created_at', 'desc');
+    }
+
+    $mutasi = $query->paginate(10);
+    
+    // Make sure pagination keeps the current query parameters
+    $mutasi->appends($request->all());
+
+    return view('siswa.mutasi', compact('mutasi'));
+}
 
     public function all(Request $request)
-    {
-        $filter = $request->input('filter');
+{
+    $filter = $request->input('filter');
+    $search = $request->input('search');
+    $sort = $request->input('sort', 'newest'); // Default to newest if not specified
 
-        $query = Dompet::with('user');
+    $query = Dompet::with('user');
 
-        if ($filter === 'topup') {
-            $query->where('description', 'Top-up');
-        } elseif ($filter === 'withdraw') {
-            $query->where('description', 'Withdraw');
-        } elseif ($filter === 'transfer') {
-            $query->where('description', 'Transfer');
-        } elseif ($filter === 'rejected') {
-            $query->where('status', 'rejected');
-        }
-
-        if ($filter === 'all' || !$filter) {
-            // No additional filtering
-        }
-
-        $mutasi = $query->orderBy('created_at', 'desc')->get();
-
-        return view('wallet.all', compact('mutasi'));
+    // Apply type filter
+    if ($filter === 'topup') {
+        $query->where(function($q) {
+            $q->where('description', 'Top-up')
+              ->orWhere('description', 'LIKE', '%Top-up%');
+        });
+    } elseif ($filter === 'withdraw') {
+        $query->where(function($q) {
+            $q->where('description', 'Tarik Tunai')
+              ->orWhere('description', 'LIKE', '%Withdraw%')
+              ->orWhere('description', 'LIKE', '%Tarik%');
+        });
+    } elseif ($filter === 'transfer') {
+        $query->where('description', 'LIKE', '%Transfer%');
+    } elseif ($filter === 'rejected') {
+        $query->where('status', 'rejected');
     }
 
-    public function exportPDF(Request $request, $userId = null)
-    {
-        $user = Auth::user();
-
-        if ($user->role === 'siswa') {
-            $mutasi = Dompet::with('user')->where('user_id', $user->id)->get();
-        } else {
-            $mutasi = Dompet::with('user')->get();
-        }
-
-        $pdf = Pdf::loadView('riwayat-transaksi', compact('mutasi'));
-        return $pdf->download('riwayat_transaksi.pdf');
+    // Apply search if provided
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            // Search in description
+            $q->where('description', 'LIKE', '%' . $search . '%')
+              // Search by user name (using relationship)
+              ->orWhereHas('user', function($query) use ($search) {
+                  $query->where('name', 'LIKE', '%' . $search . '%');
+              });
+        });
     }
+
+    // Apply sorting
+    if ($sort === 'oldest') {
+        $query->orderBy('created_at', 'asc');
+    } else {
+        // Default to newest
+        $query->orderBy('created_at', 'desc');
+    }
+
+    $mutasi = $query->paginate(10);
+    
+    // Make sure pagination keeps the current query parameters
+    $mutasi->appends($request->all());
+
+    return view('wallet.all', compact('mutasi'));
+}
+
+
+public function exportPDF(Request $request)
+{
+    $filter = $request->input('filter');
+    $search = $request->input('search');
+    $sort = $request->input('sort', 'newest'); // Default to newest if not specified
+    $user = Auth::user();
+    
+    $query = Dompet::with('user');
+    
+    // If the user is a student, only show their transactions
+    if ($user->role === 'siswa') {
+        $query->where('user_id', $user->id);
+    }
+    
+    // Apply the same filters as in the all() method
+    if ($filter === 'topup') {
+        $query->where(function($q) {
+            $q->where('description', 'Top-up')
+              ->orWhere('description', 'LIKE', '%Top-up%');
+        });
+    } elseif ($filter === 'withdraw') {
+        $query->where(function($q) {
+            $q->where('description', 'Tarik Tunai')
+              ->orWhere('description', 'LIKE', '%Withdraw%')
+              ->orWhere('description', 'LIKE', '%Tarik%');
+        });
+    } elseif ($filter === 'transfer') {
+        $query->where('description', 'LIKE', '%Transfer%');
+    } elseif ($filter === 'rejected') {
+        $query->where('status', 'rejected');
+    }
+    
+    // Apply search if provided
+    if ($search) {
+        $query->where(function($q) use ($search) {
+            // Search in description
+            $q->where('description', 'LIKE', '%' . $search . '%')
+              // Search by user name (using relationship)
+              ->orWhereHas('user', function($query) use ($search) {
+                  $query->where('name', 'LIKE', '%' . $search . '%');
+              });
+        });
+    }
+    
+    // Apply sorting
+    if ($sort === 'oldest') {
+        $query->orderBy('created_at', 'asc');
+    } else {
+        // Default to newest
+        $query->orderBy('created_at', 'desc');
+    }
+    
+    $mutasi = $query->get();
+    
+    // Pass filter, search, and sort parameters to the view
+    $filter_text = '';
+    if ($filter) {
+        $filter_text = match($filter) {
+            'topup' => 'Top-up',
+            'withdraw' => 'Tarik Tunai',
+            'transfer' => 'Transfer',
+            'rejected' => 'Ditolak',
+            default => ''
+        };
+    }
+    
+    $sort_text = $sort === 'oldest' ? 'Terlama' : 'Terbaru';
+    
+    $pdf = Pdf::loadView('riwayat-transaksi', compact('mutasi', 'filter_text', 'search', 'sort_text'));
+    
+    $filename = 'riwayat_transaksi';
+    if ($filter_text) {
+        $filename .= '_' . strtolower($filter_text);
+    }
+    if ($search) {
+        $filename .= '_search_' . str_replace(' ', '_', $search);
+    }
+    $filename .= '_' . strtolower($sort_text);
+    $filename .= '.pdf';
+    
+    return $pdf->download($filename);
+    }
+
+    public function downloadSingleTransactionPDF($id)
+{
+    $transaction = Dompet::with('user')
+                    ->findOrFail($id);
+    
+    // Check permission - if user is admin, allow any transaction
+    // If user is student, only allow their own transactions
+    if (Auth::user()->role !== 'admin' && Auth::user()->id !== $transaction->user_id) {
+        abort(403, 'Unauthorized action.');
+    }
+    
+    // Generate a transaction-specific title
+    $title = 'Transaksi_' . preg_replace('/[^A-Za-z0-9]/', '_', $transaction->description);
+    $timestamp = date('Ymd_His');
+    $filename = $title . '_' . $timestamp . '.pdf';
+    
+    // Load PDF view for a single transaction
+    $pdf = Pdf::loadView('riwayat-transaksi-single', compact('transaction'));
+    
+    return $pdf->download($filename);
+}
 }

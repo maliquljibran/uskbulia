@@ -58,3 +58,7 @@ Route::post('/bank/topup', [DompetController::class, 'bankTopupToSiswa'])->name(
 Route::post('/bank/withdraw', [DompetController::class, 'bankWithdrawFromSiswa'])->name('bank.withdraw');
 
 Route::get('/wallet/export-pdf{userId?}', [DompetController::class, 'exportPDF'])->name('export.pdf');
+
+Route::get('/transaksi/download/{id}', [DompetController::class, 'downloadSingleTransactionPDF'])
+     ->name('download.transaction.pdf')
+     ->middleware('auth');
