@@ -100,8 +100,8 @@
     </table>
     
     <div class="school-info">
-        <p><strong>Dokumen ini diterbitkan secara elektronik oleh sistem E-Wallet Sekolah</strong></p>
-        <p>© {{ date('Y') }} E-Wallet Sekolah</p>
+        <p><strong>Dokumen ini diterbitkan secara elektronik oleh sistem Bank 64</strong></p>
+        <p>© {{ date('Y') }} Bank 64 </p>
     </div>
 </body>
 </html>
